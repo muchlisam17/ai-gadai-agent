@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard AI Gadai</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f2f5; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <h2>Data Potensial Nasabah Gadai</h2>
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>Nama</th>
+                <th>Barang</th>
+                <th>Pertanyaan</th>
+                <th>Estimasi</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <script>
+        async function loadData() {
+            const res = await fetch('/api/data');
+            const data = await res.json();
+            const body = document.querySelector('tbody');
+            body.innerHTML = data.map(row => `
+                <tr>
+                    <td>${row.nama_user}</td>
+                    <td>${row.jenis_barang}</td>
+                    <td>${row.pertanyaan}</td>
+                    <td>${row.estimasi_nilai}</td>
+                </tr>
+            `).join('');
+        }
+        setInterval(loadData, 2000);
+        loadData();
+    </script>
+</body>
+</html>
