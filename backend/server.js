@@ -1,50 +1,97 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const bodyParser = require('body-parser');
 const cors = require('cors');
+const Database = require('better-sqlite3');
 const path = require('path');
 
 const app = express();
 const PORT = 3000;
 
+// Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Inisialisasi Database di memori (akan hilang kalau server mati, cocok untuk test)
-const db = new sqlite3.Database(':memory:'); 
+// Database setup
+const db = new Database('/data/gadai.db');
 
-db.serialize(() => {
-    db.run(`CREATE TABLE reporting (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nama_user TEXT,
-        jenis_barang TEXT,
-        pertanyaan TEXT,
-        estimasi_nilai TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nama_user TEXT NOT NULL,
+    jenis_barang TEXT NOT NULL,
+    pertanyaan_user TEXT,
+    nama_barang TEXT,
+    estimasi_nilai INTEGER NOT NULL,
+    wilayah TEXT,
+    gramasi REAL,
+    channel TEXT DEFAULT 'Telegram',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// POST /api/transaction - simpan transaksi
+app.post('/api/transaction', (req, res) => {
+  const {
+    nama_user,
+    jenis_barang,
+    pertanyaan_user,
+    nama_barang,
+    estimasi_nilai,
+    wilayah,
+    gramasi,
+    channel
+  } = req.body;
+
+  if (!nama_user || !jenis_barang || !estimasi_nilai) {
+    return res.status(400).json({ error: 'nama_user, jenis_barang, estimasi_nilai wajib diisi' });
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO transactions (nama_user, jenis_barang, pertanyaan_user, nama_barang, estimasi_nilai, wilayah, gramasi, channel)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const result = stmt.run(
+    nama_user,
+    jenis_barang,
+    pertanyaan_user || '',
+    nama_barang || '',
+    estimasi_nilai,
+    wilayah || '',
+    gramasi || null,
+    channel || 'Telegram'
+  );
+
+  res.json({ success: true, id: result.lastInsertRowid });
 });
 
-// Endpoint untuk menerima data dari n8n
-app.post('/api/log-gadai', (req, res) => {
-    const { nama_user, jenis_barang, pertanyaan, estimasi_nilai } = req.body;
-    const stmt = db.prepare("INSERT INTO reporting (nama_user, jenis_barang, pertanyaan, estimasi_nilai) VALUES (?, ?, ?, ?)");
-    stmt.run(nama_user, jenis_barang, pertanyaan, estimasi_nilai);
-    stmt.finalize();
-    res.json({ message: "Data berhasil masuk ke dashboard!" });
+// GET /api/transactions - ambil semua transaksi
+app.get('/api/transactions', (req, res) => {
+  const transactions = db.prepare('SELECT * FROM transactions ORDER BY created_at DESC').all();
+  res.json(transactions);
 });
 
-// Endpoint untuk mengambil data ke tampilan
-app.get('/api/data', (req, res) => {
-    db.all("SELECT * FROM reporting ORDER BY timestamp DESC", [], (err, rows) => {
-        res.json(rows);
-    });
+// GET /api/stats - statistik
+app.get('/api/stats', (req, res) => {
+  const total = db.prepare('SELECT COUNT(*) as count FROM transactions').get();
+  const totalNilai = db.prepare('SELECT SUM(estimasi_nilai) as total FROM transactions').get();
+  const byJenis = db.prepare('SELECT jenis_barang, COUNT(*) as count FROM transactions GROUP BY jenis_barang').all();
+  const byWilayah = db.prepare("SELECT wilayah, COUNT(*) as count FROM transactions WHERE wilayah != '' GROUP BY wilayah").all();
+
+  res.json({
+    total_transaksi: total.count,
+    total_nilai: totalNilai.total || 0,
+    by_jenis: byJenis,
+    by_wilayah: byWilayah
+  });
 });
 
-// Menampilkan halaman dashboard
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// DELETE /api/transaction/:id - hapus transaksi
+app.delete('/api/transaction/:id', (req, res) => {
+  db.prepare('DELETE FROM transactions WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server jalan di http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Dashboard backend running on port ${PORT}`);
 });

@@ -1,0 +1,130 @@
+{
+  "name": "GadaiMulia Bot - Complete",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"]
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [220, 300],
+      "webhookId": "195a752a-262c-42d7-b63b-ad03b7481698",
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
+        "options": {
+          "systemMessage": "Kamu adalah AI Customer Service untuk layanan gadai barang (emas & elektronik) di PT Mulia Informasi Teknologi.\n\nALUR PERCAKAPAN WAJIB:\n1. Tanyakan nama user\n2. Tanyakan: \"Apakah Anda ingin menggadaikan emas atau elektronik?\"\n3. Proses sesuai jenis barang\n\n---\n\nLOGIC GADAI EMAS:\n1. Tanya gramasi emas user (berapa gram)\n2. Panggil tool get_gold_price untuk mendapatkan harga emas per gram hari ini\n3. Hitung estimasi: Estimasi = harga_per_gram × gramasi\n4. Contoh: harga Rp 2.799.966/gram × 5 gram = Rp 13.999.830\n5. Tampilkan hasil dengan format:\n   \"Estimasi harga gadai emas [X] gram adalah Rp [hasil]. Apakah Anda ingin melanjutkan?\"\n6. Jika user konfirmasi YA → panggil tool save_to_dashboard dengan data lengkap\n\n---\n\nLOGIC GADAI ELEKTRONIK:\n1. Tanya jenis dan merek barang elektronik\n2. Tanya wilayah user (Jabar, DKI Jakarta, Jatim, atau lainnya)\n3. Gunakan tool Qdrant_Retriever_Tool untuk cari harga barang di database\n4. Jika harga TIDAK ditemukan di RAG → jawab: \"Maaf, harga barang tidak ditemukan.\"\n5. Jika harga ditemukan, hitung estimasi berdasarkan wilayah:\n   - DKI Jakarta: harga × 80%\n   - Jawa Barat: harga × 70%\n   - Jawa Timur: harga × 60%\n   - Lainnya: harga × 50%\n6. Tampilkan hasil dengan format:\n   \"Estimasi harga gadai [nama barang] di wilayah [wilayah] adalah Rp [hasil]. Apakah Anda ingin melanjutkan?\"\n7. Jika user konfirmasi YA → panggil tool save_to_dashboard dengan data lengkap\n\n---\n\nATURAN PENTING:\n- Selalu gunakan Bahasa Indonesia yang sopan dan ramah\n- Jangan mengarang harga, selalu gunakan tool yang tersedia\n- Jika tool error, jawab: \"Maaf, sistem sedang mengalami gangguan. Silakan coba beberapa saat lagi.\"\n- Jangan tampilkan angka xxx atau placeholder ke user\n- Simpan ke dashboard HANYA jika estimasi berhasil dihitung dan user konfirmasi",
+          "maxIterations": 10
+        }
+      },
+      "id": "ai-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "id": "send-message",
+      "name": "Send a text message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [780, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-3.5-turbo"
+      },
+      "id": "openai-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [340, 500],
+      "credentials": {
+        "openAiApi": {
+          "id": "1",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.from.id }}"
+      },
+      "id": "simple-memory",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [500, 500]
+    },
+    {
+      "parameters": {
+        "name": "get_gold_price",
+        "description": "Gunakan tool ini untuk mendapatkan harga emas hari ini dalam Rupiah per gram berdasarkan harga pasar real-time",
+        "language": "javaScript",
+        "jsCode": "const goldData = await helpers.httpRequest({\n  method: 'GET',\n  url: 'https://data-asg.goldprice.org/dbXRates/USD'\n});\n\nconst hargaUSDPerTroyOz = goldData.items[0].xauPrice;\nconst kursUSDIDR = 16500;\nconst hargaIDRPerGram = (hargaUSDPerTroyOz / 31.1035) * kursUSDIDR;\n\nreturn \"Harga emas hari ini: Rp \" + Math.round(hargaIDRPerGram).toLocaleString('id-ID') + \" per gram\";"
+      },
+      "id": "get-gold-price",
+      "name": "get_gold_price",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [700, 500]
+    },
+    {
+      "parameters": {
+        "name": "save_to_dashboard",
+        "description": "Simpan data transaksi ke dashboard setelah user konfirmasi. Gunakan tool ini dengan format JSON: {\"nama_user\": \"nama\", \"jenis_barang\": \"emas atau elektronik\", \"pertanyaan_user\": \"pertanyaan asli user\", \"nama_barang\": \"nama barang jika elektronik\", \"estimasi_nilai\": 1000000, \"wilayah\": \"wilayah jika elektronik\", \"gramasi\": 5}",
+        "language": "javaScript",
+        "jsCode": "let input = {};\ntry {\n  input = JSON.parse(query);\n} catch(e) {\n  // coba parse sebagai string\n  const match = query.match(/\\{.*\\}/s);\n  if (match) {\n    try { input = JSON.parse(match[0]); } catch(e2) {}\n  }\n}\n\nconst result = await helpers.httpRequest({\n  method: 'POST',\n  url: 'http://gadai-dashboard:3000/api/transaction',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    nama_user: input.nama_user || 'Unknown',\n    jenis_barang: input.jenis_barang || 'emas',\n    pertanyaan_user: input.pertanyaan_user || '',\n    nama_barang: input.nama_barang || '',\n    estimasi_nilai: input.estimasi_nilai || 0,\n    wilayah: input.wilayah || '',\n    gramasi: input.gramasi || null,\n    channel: 'Telegram'\n  })\n});\n\nreturn \"Data berhasil disimpan ke dashboard dengan ID: \" + result.id;"
+      },
+      "id": "save-dashboard",
+      "name": "save_to_dashboard",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [860, 500]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+    },
+    "AI Agent": {
+      "main": [[{ "node": "Send a text message", "type": "main", "index": 0 }]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Simple Memory": {
+      "ai_memory": [[{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]]
+    },
+    "get_gold_price": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "save_to_dashboard": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

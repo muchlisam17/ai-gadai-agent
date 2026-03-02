@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Gadai — PT Mulia Informasi Teknologi</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --gold: #C9A84C;
+      --gold-light: #E8C97A;
+      --gold-dark: #8B6914;
+      --bg: #0A0A0A;
+      --surface: #111111;
+      --surface2: #1A1A1A;
+      --surface3: #222222;
+      --border: #2A2A2A;
+      --text: #F0EDE8;
+      --text-muted: #888880;
+      --green: #4CAF84;
+      --blue: #4C8EC9;
+      --red: #C94C4C;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--gold);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-sub {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--text-muted);
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Main */
+    main {
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--gold);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--gold-light);
+      line-height: 1;
+    }
+
+    .stat-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    /* Charts row */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title span {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      font-weight: 400;
+    }
+
+    /* Bar chart */
+    .bar-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bar-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .bar-label {
+      width: 80px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      flex-shrink: 0;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 24px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      color: rgba(0,0,0,0.8);
+      font-weight: 500;
+    }
+
+    .bar-fill.emas { background: var(--gold); }
+    .bar-fill.elektronik { background: var(--blue); }
+    .bar-fill.jabar { background: #4CAF84; }
+    .bar-fill.dki { background: #C94C4C; }
+    .bar-fill.jatim { background: #9C4CC9; }
+    .bar-fill.lainnya { background: #888; }
+
+    .bar-count {
+      width: 30px;
+      text-align: right;
+      font-size: 0.8rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--text-muted);
+    }
+
+    /* Table */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .refresh-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      padding: 0.75rem 1.5rem;
+      text-align: left;
+      font-size: 0.7rem;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover { background: var(--surface2); }
+    tbody tr:last-child { border-bottom: none; }
+
+    td {
+      padding: 1rem 1.5rem;
+      font-size: 0.875rem;
+      vertical-align: middle;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.72rem;
+      font-family: 'DM Mono', monospace;
+      font-weight: 500;
+    }
+
+    .tag-emas {
+      background: rgba(201,168,76,0.15);
+      color: var(--gold-light);
+      border: 1px solid rgba(201,168,76,0.3);
+    }
+
+    .tag-elektronik {
+      background: rgba(76,142,201,0.15);
+      color: #7EC8FF;
+      border: 1px solid rgba(76,142,201,0.3);
+    }
+
+    .nilai {
+      font-family: 'DM Mono', monospace;
+      color: var(--gold-light);
+      font-weight: 500;
+    }
+
+    .time {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .delete-btn {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+    }
+
+    .delete-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .empty-state {
+      padding: 4rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.875rem;
+    }
+
+    .empty-state .emoji { font-size: 2rem; margin-bottom: 1rem; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .charts-row { grid-template-columns: 1fr; }
+    }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      gap: 8px;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.875rem;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏆</div>
+    <div>
+      <div class="logo-text">GadaiMulia Dashboard</div>
+      <div class="logo-sub">PT Mulia Informasi Teknologi</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-dot"></div>
+    <div class="badge" id="last-update">Memuat...</div>
+  </div>
+</header>
+
+<main>
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Transaksi</div>
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-sub">semua channel</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Estimasi Nilai</div>
+      <div class="stat-value" id="stat-nilai">—</div>
+      <div class="stat-sub">akumulasi</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Gadai Emas</div>
+      <div class="stat-value" id="stat-emas">—</div>
+      <div class="stat-sub">transaksi</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Gadai Elektronik</div>
+      <div class="stat-value" id="stat-elektronik">—</div>
+      <div class="stat-sub">transaksi</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="card-title">Jenis Barang <span>distribusi</span></div>
+      <div class="bar-group" id="chart-jenis">
+        <div class="loading"><div class="spinner"></div> Memuat...</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">Wilayah <span>distribusi</span></div>
+      <div class="bar-group" id="chart-wilayah">
+        <div class="loading"><div class="spinner"></div> Memuat...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-header">
+      <div class="card-title" style="margin:0">Riwayat Transaksi</div>
+      <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+    </div>
+    <div id="table-container">
+      <div class="loading"><div class="spinner"></div> Memuat data...</div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const API = '';  // same origin
+
+  function formatRupiah(num) {
+    if (!num) return 'Rp 0';
+    return 'Rp ' + Number(num).toLocaleString('id-ID');
+  }
+
+  function formatDate(str) {
+    const d = new Date(str);
+    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function loadStats() {
+    const res = await fetch(API + '/api/stats');
+    const data = await res.json();
+
+    document.getElementById('stat-total').textContent = data.total_transaksi;
+    document.getElementById('stat-nilai').textContent =
+      data.total_nilai >= 1000000
+        ? 'Rp ' + (data.total_nilai / 1000000).toFixed(1) + 'M'
+        : formatRupiah(data.total_nilai);
+
+    // By jenis
+    const emas = data.by_jenis.find(x => x.jenis_barang === 'emas') || { count: 0 };
+    const elektronik = data.by_jenis.find(x => x.jenis_barang === 'elektronik') || { count: 0 };
+    document.getElementById('stat-emas').textContent = emas.count;
+    document.getElementById('stat-elektronik').textContent = elektronik.count;
+
+    const total = data.total_transaksi || 1;
+
+    // Chart jenis
+    document.getElementById('chart-jenis').innerHTML = `
+      <div class="bar-item">
+        <div class="bar-label">Emas</div>
+        <div class="bar-track">
+          <div class="bar-fill emas" style="width:${(emas.count/total*100)}%">${emas.count > 0 ? emas.count : ''}</div>
+        </div>
+        <div class="bar-count">${emas.count}</div>
+      </div>
+      <div class="bar-item">
+        <div class="bar-label">Elektronik</div>
+        <div class="bar-track">
+          <div class="bar-fill elektronik" style="width:${(elektronik.count/total*100)}%">${elektronik.count > 0 ? elektronik.count : ''}</div>
+        </div>
+        <div class="bar-count">${elektronik.count}</div>
+      </div>
+    `;
+
+    // Chart wilayah
+    const wilayahColors = { 'Jabar': 'jabar', 'DKI Jakarta': 'dki', 'Jatim': 'jatim', 'Lainnya': 'lainnya' };
+    const maxW = Math.max(...data.by_wilayah.map(x => x.count), 1);
+    document.getElementById('chart-wilayah').innerHTML = data.by_wilayah.length > 0
+      ? data.by_wilayah.map(w => `
+          <div class="bar-item">
+            <div class="bar-label">${w.wilayah || 'Lainnya'}</div>
+            <div class="bar-track">
+              <div class="bar-fill ${wilayahColors[w.wilayah] || 'lainnya'}" style="width:${(w.count/maxW*100)}%">${w.count > 0 ? w.count : ''}</div>
+            </div>
+            <div class="bar-count">${w.count}</div>
+          </div>
+        `).join('')
+      : '<div style="color:var(--text-muted);font-size:0.8rem;font-family:DM Mono,monospace">Belum ada data wilayah</div>';
+  }
+
+  async function loadTransactions() {
+    const res = await fetch(API + '/api/transactions');
+    const data = await res.json();
+
+    if (data.length === 0) {
+      document.getElementById('table-container').innerHTML = `
+        <div class="empty-state">
+          <div class="emoji">📭</div>
+          Belum ada transaksi yang tercatat.<br>
+          Mulai percakapan di Telegram bot untuk mencatat transaksi.
+        </div>
+      `;
+      return;
+    }
+
+    document.getElementById('table-container').innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nama User</th>
+            <th>Jenis</th>
+            <th>Barang</th>
+            <th>Wilayah</th>
+            <th>Estimasi Nilai</th>
+            <th>Waktu</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map(t => `
+            <tr>
+              <td class="time">${t.id}</td>
+              <td><strong>${t.nama_user}</strong></td>
+              <td>
+                <span class="tag ${t.jenis_barang === 'emas' ? 'tag-emas' : 'tag-elektronik'}">
+                  ${t.jenis_barang === 'emas' ? '⚡ Emas' : '📱 Elektronik'}
+                </span>
+              </td>
+              <td>${t.nama_barang || (t.jenis_barang === 'emas' ? t.gramasi + ' gram' : '—')}</td>
+              <td class="time">${t.wilayah || '—'}</td>
+              <td class="nilai">${formatRupiah(t.estimasi_nilai)}</td>
+              <td class="time">${formatDate(t.created_at)}</td>
+              <td>
+                <button class="delete-btn" onclick="deleteTransaction(${t.id})">✕</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  async function deleteTransaction(id) {
+    if (!confirm('Hapus transaksi ini?')) return;
+    await fetch(API + '/api/transaction/' + id, { method: 'DELETE' });
+    loadData();
+  }
+
+  async function loadData() {
+    document.getElementById('last-update').textContent =
+      'Update: ' + new Date().toLocaleTimeString('id-ID');
+    await loadStats();
+    await loadTransactions();
+  }
+
+  // Load on start
+  loadData();
+
+  // Auto refresh every 30 seconds
+  setInterval(loadData, 30000);
+</script>
+</body>
+</html>
