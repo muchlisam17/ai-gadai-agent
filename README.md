@@ -27,18 +27,19 @@ n8n Workflow Orchestrator
      ├──► AI Agent (GPT-3.5-turbo / OpenAI)
      │         │
      │         ├──► Tool: get_gold_price
-     │         │         └── goldprice.org API (real-time)
+     │         │         └── metals.live API (real-time, fallback hardcode)
      │         │
      │         ├──► Tool: Qdrant Retriever (RAG)
-     │         │         └── Embeddings: bge-m3:567m (Ollama)
-     │         │             └── Vector DB: Qdrant (446 vectors)
+     │         │         └── Embeddings: bge-m3:567m (Ollama, 100% GPU)
+     │         │             └── Vector DB: Qdrant (446 vectors, 1024 dim)
      │         │
      │         └──► Tool: save_to_dashboard
-     │                   └── Dashboard Backend (Node.js + SQLite)
+     │                   └── Dashboard Backend (Node.js + Express + PostgreSQL)
      │
      └──► Simple Memory (per user session by Telegram ID)
 
-Dashboard: http://localhost:3000
+Dashboard Backend : http://localhost:3000
+Dashboard Frontend: http://localhost:3001
 ```
 
 ---
@@ -49,14 +50,14 @@ Dashboard: http://localhost:3000
 1. Bot tanya nama user
 2. User pilih "emas"
 3. Bot tanya gramasi
-4. Bot panggil `get_gold_price` → goldprice.org API → konversi IDR/gram
+4. Bot panggil `get_gold_price` → metals.live API → konversi IDR/gram
 5. Hitung: `Estimasi = harga_per_gram × gramasi`
 6. User konfirmasi → bot simpan ke dashboard via `save_to_dashboard`
 
 ### Gadai Elektronik
 1. Bot tanya nama user
 2. User pilih "elektronik"
-3. Bot tampilkan list barang tersedia
+3. Bot tampilkan contoh list barang tersedia
 4. User pilih barang, bot tanya wilayah
 5. Bot panggil Qdrant Retriever (RAG) dengan query nama barang saja
 6. Jika tidak ditemukan → "Maaf, harga barang tidak ditemukan."
@@ -72,59 +73,85 @@ Dashboard: http://localhost:3000
 ## Cara Setup & Menjalankan
 
 ### Prasyarat
-- Docker Desktop
+- Docker Desktop (RAM minimal 6GB untuk WSL2)
+- Node.js ≥ 18
 - ngrok
 - PowerShell (Windows)
 
 ### Langkah 1 — Clone Repository
 ```bash
-git clone <repo-url>
+git clone https://github.com/muchlisam17/ai-gadai-agent.git
 cd ai-gadai-agent
 ```
 
-### Langkah 2 — Jalankan Docker
+### Langkah 2 — Jalankan Docker (n8n + Qdrant + Ollama + PostgreSQL + Backend)
 ```bash
+# Tanpa GPU
 docker compose up -d --build
+
+# Dengan GPU (NVIDIA)
+docker compose -f docker-compose-gpu.yml up -d --build
 ```
 
 Tunggu semua container siap:
-- `n8n` → http://localhost:5678
-- `qdrant` → http://localhost:6333
-- `ollama` → http://localhost:11434
-- `gadai-dashboard` → http://localhost:3000
+- `n8n`              → http://localhost:5678
+- `qdrant`           → http://localhost:6333
+- `ollama`           → http://localhost:11434
+- `postgres`         → localhost:5432
+- `gadai-dashboard`  → http://localhost:3000
 
-### Langkah 3 — Setup Ollama (pertama kali)
+Cek backend berjalan:
+```
+http://localhost:3000/health  →  {"status":"ok"}
+```
+
+### Langkah 3 — Jalankan Frontend React
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Dashboard terbuka di: http://localhost:3001
+
+### Langkah 4 — Setup Ollama (pertama kali)
 ```bash
 docker exec ollama ollama pull bge-m3:567m
 ```
 
-### Langkah 4 — Restore Qdrant Snapshot
+### Langkah 5 — Restore Qdrant Snapshot
 1. Buka http://localhost:6333/dashboard
 2. Klik **Collections** → **Upload Snapshot**
 3. Upload file `rag_data_2026.snapshot`
-4. Collection name: `rag_data`
+4. Collection name: `rag_data_2026`
 
-### Langkah 5 — Setup ngrok
+### Langkah 6 — Setup ngrok
 ```powershell
 ngrok http 5678
 ```
 Catat URL ngrok (contoh: https://xxxx.ngrok-free.app)
 
-### Langkah 6 — Import Workflow n8n
+### Langkah 7 — Import Workflow n8n
 1. Buka http://localhost:5678
 2. Import `workflow_gadai_complete.json`
 3. Set credentials:
-   - Telegram Bot Token: `8751824911:AAHpzpmYrfpq2ROMYbdVAyPIhey33_HVa1Y`
+   - Telegram Bot Token: (isi dengan token bot Anda)
    - OpenAI API Key: (isi dengan key Anda)
+   - Ollama URL: http://ollama:11434
+   - Qdrant URL: http://qdrant:6333
 4. Publish workflow
 
-### Langkah 7 — Set Telegram Webhook
-```powershell
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<NGROK_URL>/webhook/<WORKFLOW_ID>/webhook"
+### Langkah 8 — Set Telegram Webhook
+Setelah ngrok jalan, webhook sudah otomatis terset via n8n Telegram Trigger node.
+Pastikan workflow sudah di-Publish dan ngrok aktif.
+
+### Langkah 9 — Verifikasi Database PostgreSQL
+```bash
+docker exec postgres psql -U gadai_user -d gadai_db -c "SELECT * FROM transactions;"
 ```
 
-### Langkah 8 — Akses Dashboard
-Buka http://localhost:3000
+### Langkah 10 — Akses Dashboard
+Buka http://localhost:3001
 
 ---
 
@@ -139,12 +166,12 @@ User:  Muchlis
 Bot:   Apakah Anda ingin menggadaikan emas atau elektronik, Muchlis?
 User:  Emas
 Bot:   Berapa gram emas yang ingin Anda gadaikan?
-User:  5 gram
-Bot:   Estimasi harga gadai emas 5 gram adalah Rp 13.999.830.
+User:  10 gram
+Bot:   Estimasi harga gadai emas 10 gram adalah Rp 16.900.000.
        Apakah Anda ingin melanjutkan?
 User:  Iya
-Bot:   Data Anda telah kami catat. Apakah ada barang lain yang ingin
-       Anda gadaikan? (emas/elektronik)
+Bot:   Baik, estimasi harga telah disimpan.
+       Apakah ada barang lain yang ingin Anda gadaikan? (emas/elektronik)
 User:  Tidak
 Bot:   Baik, sampai jumpa Muchlis! Semoga transaksi Anda berjalan lancar.
 ```
@@ -164,18 +191,28 @@ Bot:   Anda berada di wilayah mana?
        2. DKI Jakarta
        3. Jawa Timur (Jatim)
        4. Lainnya
-User:  Jawa Barat
+User:  1
 Bot:   Estimasi harga gadai Samsung Galaxy Z Flip 1 di wilayah
-       Jawa Barat adalah Rp 3.457.440. Apakah Anda ingin melanjutkan?
+       Jawa Barat adalah Rp 2.420.208. Apakah Anda ingin melanjutkan?
 User:  Iya
-Bot:   Data Anda telah kami catat.
+Bot:   Baik, estimasi harga telah disimpan.
 ```
 
 ### Skenario 3 — Gadai Elektronik (Tidak Ditemukan)
 ```
-User:  Kamera Canon
+User:  iPhone 17
 Bot:   Maaf, harga barang tidak ditemukan di database kami.
        Apakah ingin mencoba barang lain dari list di atas?
+```
+
+### Skenario 4 — User Menolak Memberikan Nama
+```
+User:  Halo
+Bot:   Halo! Selamat datang di layanan gadai PT Mulia Informasi Teknologi.
+       Boleh saya tahu nama Anda?
+User:  Tidak mau
+Bot:   Maaf, saya tidak bisa membantu tanpa informasi nama.
+       Jika Anda ingin memulai layanan gadai, silakan berikan nama Anda.
 ```
 
 ---
@@ -186,11 +223,12 @@ Bot:   Maaf, harga barang tidak ditemukan di database kami.
 |----------|-----------|
 | Workflow Orchestrator | n8n (self-hosted) |
 | LLM | GPT-3.5-turbo (OpenAI) |
-| Embeddings | bge-m3:567m (Ollama) |
+| Embeddings | bge-m3:567m (Ollama, GPU) |
 | Vector DB | Qdrant |
 | Channel | Telegram |
-| Backend | Node.js + Express + SQLite |
-| Dashboard | HTML/CSS/JS |
+| Backend (BE) | JavaScript — Node.js + Express |
+| Frontend (FE) | React 18 (JSX + Recharts) |
+| Database (DB) | PostgreSQL 15 (via Docker) |
 | Infrastructure | Docker Compose |
 
 ---
@@ -199,6 +237,7 @@ Bot:   Maaf, harga barang tidak ditemukan di database kami.
 
 | Method | Endpoint | Deskripsi |
 |--------|----------|-----------|
+| GET | /health | Cek status server |
 | POST | /api/transaction | Simpan transaksi baru |
 | GET | /api/transactions | Ambil semua transaksi |
 | GET | /api/stats | Statistik ringkasan |
@@ -210,14 +249,24 @@ Bot:   Maaf, harga barang tidak ditemukan di database kami.
 
 ```
 ai-gadai-agent/
-├── docker-compose.yml          # Docker setup
-├── Dockerfile                  # Dashboard container
-├── README.md                   # Dokumentasi ini
-├── workflow_gadai_complete.json # n8n workflow
-├── rag_data_2026.snapshot      # Qdrant snapshot data
-├── backend/
+├── docker-compose.yml              # Docker setup (semua service)
+├── docker-compose-gpu.yml          # Docker setup dengan GPU Ollama
+├── README.md                       # Dokumentasi ini
+├── workflow_gadai_complete.json    # n8n workflow
+├── rag_data_2026.snapshot          # Qdrant snapshot data (446 items)
+├── backend/                        # BE — Node.js + Express
+│   ├── Dockerfile
 │   ├── package.json
-│   └── server.js               # Backend API (Node.js)
-└── frontend/
-    └── index.html              # Dashboard UI
+│   └── server.js                   # Entry point + PostgreSQL
+└── frontend/                       # FE — React
+    ├── package.json
+    ├── public/
+    │   └── index.html
+    └── src/
+        ├── index.js
+        ├── App.jsx                 # Root component + data fetching
+        └── components/
+            ├── StatsCards.jsx      # Kartu ringkasan (total, emas, elektronik, nilai)
+            ├── DistribusiChart.jsx # Bar chart distribusi jenis & wilayah
+            └── TransactionTable.jsx # Tabel riwayat transaksi
 ```

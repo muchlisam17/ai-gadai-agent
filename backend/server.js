@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const Database = require('better-sqlite3');
 const path = require('path');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = 3000;
@@ -11,26 +11,37 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Database setup
-const db = new Database('/data/gadai.db');
+// PostgreSQL connection
+const db = new Pool({
+  host:     process.env.DB_HOST     || 'postgres',
+  user:     process.env.DB_USER     || 'gadai_user',
+  password: process.env.DB_PASSWORD || 'gadai_pass123',
+  database: process.env.DB_NAME     || 'gadai_db',
+  port:     parseInt(process.env.DB_PORT || '5432'),
+});
 
-db.exec(`
+// Buat tabel otomatis saat pertama kali jalan
+db.query(`
   CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nama_user TEXT NOT NULL,
+    id          SERIAL PRIMARY KEY,
+    nama_user   TEXT NOT NULL,
     jenis_barang TEXT NOT NULL,
     pertanyaan_user TEXT,
     nama_barang TEXT,
-    estimasi_nilai INTEGER NOT NULL,
-    wilayah TEXT,
-    gramasi REAL,
-    channel TEXT DEFAULT 'Telegram',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    estimasi_nilai BIGINT NOT NULL,
+    wilayah     TEXT,
+    gramasi     NUMERIC(10,2),
+    channel     TEXT DEFAULT 'Telegram',
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
   )
-`);
+`).then(() => {
+  console.log('✅ Tabel transactions siap');
+}).catch(err => {
+  console.error('❌ Gagal buat tabel:', err.message);
+});
 
-// POST /api/transaction - simpan transaksi
-app.post('/api/transaction', (req, res) => {
+// POST /api/transaction - simpan transaksi (dipanggil n8n)
+app.post('/api/transaction', async (req, res) => {
   const {
     nama_user,
     jenis_barang,
@@ -46,51 +57,71 @@ app.post('/api/transaction', (req, res) => {
     return res.status(400).json({ error: 'nama_user, jenis_barang, estimasi_nilai wajib diisi' });
   }
 
-  const stmt = db.prepare(`
-    INSERT INTO transactions (nama_user, jenis_barang, pertanyaan_user, nama_barang, estimasi_nilai, wilayah, gramasi, channel)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const result = stmt.run(
-    nama_user,
-    jenis_barang,
-    pertanyaan_user || '',
-    nama_barang || '',
-    estimasi_nilai,
-    wilayah || '',
-    gramasi || null,
-    channel || 'Telegram'
-  );
-
-  res.json({ success: true, id: result.lastInsertRowid });
+  try {
+    const result = await db.query(
+      `INSERT INTO transactions
+         (nama_user, jenis_barang, pertanyaan_user, nama_barang, estimasi_nilai, wilayah, gramasi, channel)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [
+        nama_user,
+        jenis_barang,
+        pertanyaan_user || '',
+        nama_barang     || '',
+        estimasi_nilai,
+        wilayah         || '',
+        gramasi         || null,
+        channel         || 'Telegram'
+      ]
+    );
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error', detail: err.message });
+  }
 });
 
 // GET /api/transactions - ambil semua transaksi
-app.get('/api/transactions', (req, res) => {
-  const transactions = db.prepare('SELECT * FROM transactions ORDER BY created_at DESC').all();
-  res.json(transactions);
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM transactions ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// GET /api/stats - statistik
-app.get('/api/stats', (req, res) => {
-  const total = db.prepare('SELECT COUNT(*) as count FROM transactions').get();
-  const totalNilai = db.prepare('SELECT SUM(estimasi_nilai) as total FROM transactions').get();
-  const byJenis = db.prepare('SELECT jenis_barang, COUNT(*) as count FROM transactions GROUP BY jenis_barang').all();
-  const byWilayah = db.prepare("SELECT wilayah, COUNT(*) as count FROM transactions WHERE wilayah != '' GROUP BY wilayah").all();
+// GET /api/stats - statistik untuk dashboard
+app.get('/api/stats', async (req, res) => {
+  try {
+    const total     = await db.query('SELECT COUNT(*) as count FROM transactions');
+    const totalNilai = await db.query('SELECT COALESCE(SUM(estimasi_nilai),0) as total FROM transactions');
+    const byJenis   = await db.query('SELECT jenis_barang, COUNT(*) as count FROM transactions GROUP BY jenis_barang');
+    const byWilayah = await db.query("SELECT wilayah, COUNT(*) as count FROM transactions WHERE wilayah != '' GROUP BY wilayah");
 
-  res.json({
-    total_transaksi: total.count,
-    total_nilai: totalNilai.total || 0,
-    by_jenis: byJenis,
-    by_wilayah: byWilayah
-  });
+    res.json({
+      total_transaksi: parseInt(total.rows[0].count),
+      total_nilai:     parseInt(totalNilai.rows[0].total),
+      by_jenis:        byJenis.rows,
+      by_wilayah:      byWilayah.rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // DELETE /api/transaction/:id - hapus transaksi
-app.delete('/api/transaction/:id', (req, res) => {
-  db.prepare('DELETE FROM transactions WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
+app.delete('/api/transaction/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM transactions WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
+// Health check
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Dashboard backend running on port ${PORT}`);
